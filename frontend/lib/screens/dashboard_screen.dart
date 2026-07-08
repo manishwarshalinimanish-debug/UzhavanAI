@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../models/farmer.dart';
@@ -19,8 +18,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
-    with WidgetsBindingObserver {
+class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService apiService = ApiService();
 
   late Future<List<Farmer>> farmers;
@@ -33,23 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _loadFarmers();
     _loadAnalytics();
-    _loadWeatherFromCurrentLocation();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadWeatherFromCurrentLocation();
-    }
   }
 
   void _loadFarmers() {
@@ -69,38 +52,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
 
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-
-      if (!serviceEnabled) {
-        throw Exception("Location service is OFF. Please turn on GPS.");
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied) {
-        throw Exception("Location permission denied.");
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          "Location permission permanently denied. Enable it from App Settings.",
-        );
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
-        ),
-      );
-
       final weatherFuture = apiService.getWeatherByLocation(
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: 10.9323,
+        longitude: 76.9764,
       );
 
       if (!mounted) return;
@@ -108,7 +62,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       setState(() {
         weather = weatherFuture;
         isLoadingLocation = false;
-        locationError = null;
       });
 
       await weatherFuture;
@@ -128,11 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       _loadAnalytics();
     });
 
-    await Future.wait([
-      farmers,
-      analytics,
-      _loadWeatherFromCurrentLocation(),
-    ]);
+    await Future.wait([farmers, analytics]);
   }
 
   Future<void> _openAddFarmer() async {
@@ -218,16 +167,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            language.text(
-              en: "Delete failed: $error",
-              ta: "நீக்க முடியவில்லை: $error",
-            ),
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Delete failed: $error")));
     }
   }
 
@@ -273,8 +215,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             Expanded(
               child: Text(
                 language.text(
-                  en: "Getting current location and weather...",
-                  ta: "தற்போதைய இடம் மற்றும் வானிலை பெறப்படுகிறது...",
+                  en: "Loading weather...",
+                  ta: "வானிலை ஏற்றப்படுகிறது...",
                 ),
               ),
             ),
@@ -297,8 +239,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             Text(
               language.text(
-                en: "Unable to load current location weather",
-                ta: "தற்போதைய இடத்தின் வானிலையை பெற முடியவில்லை",
+                en: "Unable to load weather",
+                ta: "வானிலையை பெற முடியவில்லை",
               ),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -306,8 +248,9 @@ class _DashboardScreenState extends State<DashboardScreen>
             Text(locationError!),
             const SizedBox(height: 12),
             ElevatedButton.icon(
-              onPressed:
-                  isLoadingLocation ? null : _loadWeatherFromCurrentLocation,
+              onPressed: isLoadingLocation
+                  ? null
+                  : _loadWeatherFromCurrentLocation,
               icon: const Icon(Icons.refresh),
               label: Text(
                 language.text(en: "Try Again", ta: "மீண்டும் முயற்சி செய்"),
@@ -324,13 +267,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       return _weatherContainer(
         child: ElevatedButton.icon(
           onPressed: _loadWeatherFromCurrentLocation,
-          icon: const Icon(Icons.my_location),
-          label: Text(
-            language.text(
-              en: "Load Current Weather",
-              ta: "தற்போதைய வானிலை காண்க",
-            ),
-          ),
+          icon: const Icon(Icons.cloud),
+          label: Text(language.text(en: "Load Weather", ta: "வானிலை காண்க")),
         ),
       );
     }
@@ -348,10 +286,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: CircularProgressIndicator(),
                 ),
                 const SizedBox(width: 15),
-                Text(
-                  language.text(
-                    en: "Loading live weather...",
-                    ta: "நேரடி வானிலை ஏற்றப்படுகிறது...",
+                Expanded(
+                  child: Text(
+                    language.text(
+                      en: "Loading live weather...",
+                      ta: "நேரடி வானிலை ஏற்றப்படுகிறது...",
+                    ),
                   ),
                 ),
               ],
@@ -367,7 +307,20 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: Colors.red.shade50,
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Text("Weather Error: ${snapshot.error}"),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Weather Error: ${snapshot.error}"),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: _loadWeatherFromCurrentLocation,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(
+                    language.text(en: "Retry Weather", ta: "மீண்டும் முயற்சி"),
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
@@ -384,10 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                language.text(
-                  en: "Today's Weather - Current Location",
-                  ta: "இன்றைய வானிலை - தற்போதைய இடம்",
-                ),
+                language.text(en: "Today's Weather", ta: "இன்றைய வானிலை"),
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -443,11 +393,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       future: analytics,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(12),
-              child: CircularProgressIndicator(),
-            ),
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -468,7 +416,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.35,
+          childAspectRatio: 1.15,
           children: [
             AnalyticsCard(
               icon: Icons.people,
@@ -590,6 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   crossAxisCount: 2,
                   crossAxisSpacing: 15,
                   mainAxisSpacing: 15,
+                  childAspectRatio: 1.15,
                   children: [
                     ActionCard(
                       icon: Icons.people,
@@ -696,23 +645,26 @@ class AnalyticsCard extends StatelessWidget {
       elevation: 4,
       color: Colors.green.shade50,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.green, size: 32),
-            const SizedBox(height: 8),
+            Icon(icon, color: Colors.green, size: 28),
+            const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+            const SizedBox(height: 2),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
@@ -742,12 +694,18 @@ class ActionCard extends StatelessWidget {
         onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 45, color: Colors.green),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            Icon(icon, size: 40, color: Colors.green),
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
