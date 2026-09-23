@@ -98,6 +98,186 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openServerSettings() async {
+    final language = Provider.of<LanguageProvider>(context, listen: false);
+    final controller = TextEditingController(text: ApiService.baseUrl);
+    bool testing = false;
+    String? statusMessage;
+    bool isSuccess = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogStateCtx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.cloud_sync, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    language.text(
+                      en: "Server Settings",
+                      ta: "சர்வர் இணைப்பு",
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      language.text(
+                        en: "Enter Backend URL (works on Any Network / Mobile Data / Cloud):",
+                        ta: "சர்வர் முகவரியை உள்ளிடவும் (மொபைல் டேட்டா / எந்த நெட்வொர்க்கிலும் இயங்கும்):",
+                      ),
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: language.text(en: "Backend URL", ta: "சர்வர் URL"),
+                        hintText: "https://your-tunnel.trycloudflare.com",
+                        prefixIcon: const Icon(Icons.link),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.cloud_done, size: 16),
+                          label: const Text("Cloud (Render)"),
+                          onPressed: () {
+                            setDialogState(() {
+                              controller.text = "https://uzhavanai-backend-new.onrender.com";
+                              statusMessage = null;
+                            });
+                          },
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.wifi, size: 16),
+                          label: const Text("Wi-Fi IP"),
+                          onPressed: () {
+                            setDialogState(() {
+                              controller.text = "http://10.99.130.185:8000";
+                              statusMessage = null;
+                            });
+                          },
+                        ),
+                        ActionChip(
+                          avatar: const Icon(Icons.usb, size: 16),
+                          label: const Text("USB (Localhost)"),
+                          onPressed: () {
+                            setDialogState(() {
+                              controller.text = "http://127.0.0.1:8000";
+                              statusMessage = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (statusMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSuccess ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSuccess ? Colors.green : Colors.red,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSuccess ? Icons.check_circle : Icons.error,
+                              color: isSuccess ? Colors.green : Colors.red,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                statusMessage!,
+                                style: TextStyle(
+                                  color: isSuccess ? Colors.green.shade900 : Colors.red.shade900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(language.text(en: "Cancel", ta: "ரத்து செய்")),
+                ),
+                TextButton(
+                  onPressed: testing
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            testing = true;
+                            statusMessage = null;
+                          });
+                          final ok = await ApiService.testConnection(controller.text);
+                          setDialogState(() {
+                            testing = false;
+                            isSuccess = ok;
+                            statusMessage = ok
+                                ? language.text(en: "Connected successfully!", ta: "வெற்றிகரமாக இணைக்கப்பட்டது!")
+                                : language.text(en: "Connection failed! Check server.", ta: "இணைக்க முடியவில்லை! சரிபார்க்கவும்.");
+                          });
+                        },
+                  child: testing
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(language.text(en: "Test", ta: "சோதனை")),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    final newUrl = controller.text.trim();
+                    if (newUrl.isNotEmpty) {
+                      Navigator.pop(dialogCtx);
+                      await ApiService.setBaseUrl(newUrl);
+                      if (!mounted) return;
+                      _refreshDashboard();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            language.text(
+                              en: "Server URL updated to $newUrl",
+                              ta: "சர்வர் முகவரி மாற்றப்பட்டது: $newUrl",
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(language.text(en: "Save", ta: "சேமி")),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openEditFarmer(Farmer farmer) async {
     final result = await Navigator.push(
       context,
@@ -458,6 +638,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text("UzhavanAI"),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.green),
+            tooltip: language.text(en: "Server Settings", ta: "சர்வர் அமைப்பு"),
+            onPressed: _openServerSettings,
+          ),
           TextButton(
             onPressed: language.toggleLanguage,
             child: Text(

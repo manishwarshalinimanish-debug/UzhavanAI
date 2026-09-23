@@ -5,13 +5,17 @@ import uuid
 import time
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from database import engine
+from database import engine, init_db
 from ai.predict import predict_image
 from ai.recommendations import get_recommendation
 
+
+init_db()
 
 app = FastAPI(
     title="UzhavanAI API",
@@ -19,9 +23,28 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
+
+
+def format_datetime(value):
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
 
 WEATHER_CACHE = {}
 WEATHER_CACHE_SECONDS = 60 * 30
@@ -152,7 +175,7 @@ def get_predictions():
                 "prevention": row.prevention,
                 "fertilizer": row.fertilizer,
                 "image_name": row.image_name,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_at": format_datetime(row.created_at),
             })
 
     return predictions
@@ -527,7 +550,7 @@ def get_recovery_trackers():
                 "prediction_id": row.prediction_id,
                 "crop": row.crop,
                 "disease": row.disease,
-                "started_at": row.started_at.isoformat() if row.started_at else None,
+                "started_at": format_datetime(row.started_at),
                 "status": row.status,
             })
 
@@ -568,7 +591,7 @@ def get_recovery_tracker_details(tracker_id: int):
                 "image_name": row.image_name,
                 "confidence": row.confidence,
                 "notes": row.notes,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_at": format_datetime(row.created_at),
             })
 
     return {
@@ -576,7 +599,7 @@ def get_recovery_tracker_details(tracker_id: int):
         "prediction_id": tracker.prediction_id,
         "crop": tracker.crop,
         "disease": tracker.disease,
-        "started_at": tracker.started_at.isoformat() if tracker.started_at else None,
+        "started_at": format_datetime(tracker.started_at),
         "status": tracker.status,
         "updates": updates,
     }
@@ -789,7 +812,7 @@ def get_report_data():
                 "prevention": row.prevention,
                 "fertilizer": row.fertilizer,
                 "image_name": row.image_name,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_at": format_datetime(row.created_at),
             }
             for row in predictions_result
         ]
@@ -808,7 +831,7 @@ def get_report_data():
                 "prediction_id": row.prediction_id,
                 "crop": row.crop,
                 "disease": row.disease,
-                "started_at": row.started_at.isoformat() if row.started_at else None,
+                "started_at": format_datetime(row.started_at),
                 "status": row.status,
             }
             for row in recovery_result

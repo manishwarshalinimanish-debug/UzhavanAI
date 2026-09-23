@@ -34,3 +34,5 @@ backend/uploads/
 
 # Temporary files
 *.log
+*.db
+cloudflared.exe

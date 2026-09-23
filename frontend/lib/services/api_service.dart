@@ -3,11 +3,46 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/farmer.dart';
 
 class ApiService {
-  static const String baseUrl = "https://uzhavanai-backend.onrender.com";
+  // Permanent deployed Cloud backend on Render
+  static const String defaultUrl = "https://uzhavanai-backend-new.onrender.com";
+  static String _baseUrl = defaultUrl;
+
+  static String get baseUrl => _baseUrl;
+
+  static Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString("backend_url");
+      if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+        _baseUrl = savedUrl.trim().replaceAll(RegExp(r'/+$'), '');
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> setBaseUrl(String newUrl) async {
+    _baseUrl = newUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("backend_url", _baseUrl);
+    } catch (_) {}
+  }
+
+  static Future<bool> testConnection(String testUrl) async {
+    try {
+      final cleanUrl = testUrl.trim().replaceAll(RegExp(r'/+$'), '');
+      final response = await http
+          .get(Uri.parse(cleanUrl))
+          .timeout(const Duration(seconds: 6));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<List<Farmer>> getFarmers() async {
     final response = await http.get(Uri.parse('$baseUrl/farmers'));
