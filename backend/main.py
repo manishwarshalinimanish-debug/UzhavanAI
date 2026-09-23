@@ -1,8 +1,14 @@
-import httpx
+import os
+import sys
 from pathlib import Path
 import shutil
 import uuid
 import time
+import httpx
+
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +19,6 @@ from sqlalchemy import text
 from database import engine, init_db
 from ai.predict import predict_image
 from ai.recommendations import get_recommendation
-
 
 init_db()
 
